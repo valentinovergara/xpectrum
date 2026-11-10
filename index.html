@@ -35,8 +35,21 @@ body.clean #hud{display:none}
 h4{margin:12px 0 6px;font-size:10px;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);font-weight:600}
 h4 small{text-transform:none;letter-spacing:0;opacity:.75}
 .grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:5px}
-.grid5{display:grid;grid-template-columns:repeat(5,1fr);gap:5px}
-.grid5 .cell{font-size:10.5px;padding:6px 4px}
+.count{display:inline-block;background:var(--pink);color:#140510;border-radius:999px;padding:1px 7px;font-size:10px;letter-spacing:0;margin-left:4px;font-weight:700}
+.pad{position:relative;aspect-ratio:16/10;border-radius:8px;background:#1b1720 center/cover no-repeat;cursor:pointer;overflow:hidden;user-select:none;border:1px solid rgba(255,255,255,.1)}
+.pad .n{position:absolute;top:3px;left:5px;font-size:9px;font-weight:800;text-shadow:0 1px 2px #000}
+.pad .nm{position:absolute;left:0;right:0;bottom:0;padding:8px 5px 3px;font-size:9.5px;background:linear-gradient(transparent,rgba(0,0,0,.8));white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pad.on{border:2px solid var(--pink);box-shadow:0 0 12px rgba(255,79,163,.5)}
+.pad.over,.assigning .pad{outline:2px dashed var(--gold);outline-offset:1px}
+.vizlib{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.vz{position:relative;aspect-ratio:16/10;border-radius:8px;background:#1b1720 center/cover no-repeat;cursor:pointer;overflow:hidden;user-select:none;border:1px solid rgba(255,255,255,.08)}
+.vz .nm{position:absolute;left:0;right:0;bottom:0;padding:8px 5px 3px;font-size:9.5px;background:linear-gradient(transparent,rgba(0,0,0,.8))}
+.vz .pin{position:absolute;top:2px;right:2px;padding:1px 4px;font-size:10px;border-radius:6px;background:rgba(0,0,0,.55);border:0;opacity:0;transition:opacity .15s}
+.vz:hover .pin{opacity:1}
+.vz .tag{position:absolute;top:3px;left:4px;font-size:8.5px;font-weight:800;color:var(--pink);text-shadow:0 1px 2px #000}
+.vz.on{border:2px solid var(--pink)}
+.vz.picked{outline:2px dashed var(--gold);outline-offset:1px}
+.noimg{display:grid;place-items:center;font-size:20px;color:rgba(255,255,255,.25)}
 .lib{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
 .li{position:relative;aspect-ratio:1;border-radius:8px;overflow:hidden;background:#222 center/cover no-repeat}
 .li video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;pointer-events:none}
@@ -96,8 +109,12 @@ button.on{background:var(--pink);color:#140510;border-color:transparent}
   <div class="meters"><div><i id="mB"></i></div><div><i id="mM"></i></div><div><i id="mH"></i></div></div>
   <div class="mlab"><span>bombo</span><span>bajo</span><span>hats</span></div>
 
-  <h4>Escenas · pads banco A (1–8) · teclas 9 y 0</h4>
-  <div id="scenes" class="grid5"></div>
+  <h4>Pads · banco A (teclas 1–8) <small>arrastra un visual aquí</small></h4>
+  <div id="pads" class="grid4"></div>
+
+  <h4>Visuales <span id="vizCount" class="count"></span> <small>clic = ver · 📌 = asignar a un pad</small></h4>
+  <div id="viz" class="vizlib"></div>
+  <div class="row"><button id="thumbAll" style="flex:1">📸 Generar miniaturas</button></div>
 
   <h4>Perillas</h4>
   <div id="knobs"></div>
@@ -126,7 +143,7 @@ button.on{background:var(--pink);color:#140510;border-color:transparent}
   <div id="learnHint" class="hint"></div>
   <p class="keys">
     <b>Teclado del MPK:</b> lanza ráfagas de color · <b>Joystick:</b> cambia el color y el zoom<br>
-    <b>Computador:</b> 1–9 y 0 escenas · Q–I media · ⌫ quitar media · Espacio tap tempo · Enter mensaje · H ocultar panel · F pantalla completa<br>
+    <b>Computador:</b> 1–8 pads · 9/0 visual anterior/siguiente · Q–I media · ⌫ quitar media · Espacio tap tempo · Enter mensaje · H ocultar panel · F pantalla completa<br>
     <b>Media:</b> clic = activar · doble clic = ajuste completo/centrado · clic derecho = vaciar
   </p>
 </div>
@@ -203,8 +220,14 @@ const store = {
 };
 
 // ---------- Estado ----------
-const SCENES = ['Túnel','Espectro','Partículas','Flujo','Distorsión','Ondas','Caleidoscopio','Estrobo','Rejilla','Solo media'];
+const SCENES = ['Túnel','Espectro','Partículas','Flujo','Distorsión','Ondas','Caleidoscopio','Estrobo','Rejilla','Solo media','Corazón'];
 const SC_DIST = 4;
+const SCENE_ICON = ['⬡','◉','✦','≋','🌀','∿','✿','⚡','▦','▣','♥'];
+// qué visual dispara cada pad (se puede cambiar arrastrando desde la biblioteca)
+const DEFAULT_PADS = [0, 1, 2, 3, 4, 10, 6, 7];
+let pads = store.get('pads', DEFAULT_PADS).slice(0, 8);
+while (pads.length < 8) pads.push(DEFAULT_PADS[pads.length]);
+pads = pads.map(v => (v >= 0 && v < SCENES.length) ? v : 0);
 const PARAMS = [
   {id:'gain',   name:'Reactividad', v:0.55},
   {id:'speed',  name:'Velocidad',   v:0.4},
@@ -222,7 +245,7 @@ let saveT = 0;
 function saveParamsSoon(){ clearTimeout(saveT); saveT = setTimeout(() => { const o = {}; PARAMS.forEach(p => o[p.id] = p.v); store.set('params', o); }, 400); }
 
 const state = {
-  scene: Math.min(9, store.get('scene', 0)), mediaSlot: -1, flash: 0, bend: 0, mod: 0,
+  scene: Math.min(10, store.get('scene', 0)), mediaSlot: -1, flash: 0, bend: 0, mod: 0,
   message: store.get('message', ''), showMsg: false, hud: true,
   learnMode: false, learn: null, t: 0, rot: 0, shape: 0, beatNow: false
 };
@@ -256,11 +279,11 @@ function noteOn(ch, note, vel){
     const t = state.learn.target;
     for (const k in MAP.notes) { const x = MAP.notes[k]; if (x.type === t.type && x.i === t.i) delete MAP.notes[k]; }
     MAP.notes[ch + ':' + note] = {type:t.type, i:t.i};
-    finishLearn(`${t.type === 'scene' ? 'Escena' : 'Media'} ${t.i+1} ← nota ${note} (canal ${ch+1})`);
+    finishLearn(`${t.type === 'scene' ? 'Pad' : 'Media'} ${t.i+1} ← nota ${note} (canal ${ch+1})`);
     return;
   }
   const hit = MAP.notes[ch + ':' + note];
-  if (hit) { hit.type === 'scene' ? setScene(hit.i, vel) : toggleMedia(hit.i); return; }
+  if (hit) { hit.type === 'scene' ? triggerPad(hit.i, vel) : toggleMedia(hit.i); return; }
   keyBurst(note, vel);
 }
 function ccIn(ch, num, val){
@@ -924,7 +947,58 @@ function setDistort(item){
   store.set('distort', item.name); renderLib();
 }
 
-const SCENE_FN = [sTunnel, sSpectrum, sParticles, sFlow, sDistort, sWaves, sKaleido, sStrobe, sGrid, sMediaOnly];
+// Corazón: túnel de corazones, corazón central que late con el bombo y chispas que salen en cada golpe
+function heartPt(t){
+  return [16 * Math.pow(Math.sin(t), 3), -(13*Math.cos(t) - 5*Math.cos(2*t) - 2*Math.cos(3*t) - Math.cos(4*t)) - 2.5];
+}
+function heartPath(c, s){
+  c.beginPath();
+  for (let k = 0; k <= 120; k++) { const [x, y] = heartPt(k / 120 * TAU); k ? c.lineTo(x*s, y*s) : c.moveTo(x*s, y*s); }
+  c.closePath();
+}
+const sparks = [];
+function sHeart(c, dt){
+  const h = 345 + Math.sin(state.t * 0.2) * 15 + state.bend * 60 + (P.hue.cur - 0.9) * 360;   // rosa/rojo por defecto; la perilla 3 lo mueve
+  const m = M(), base = m / 85, k = m / 900;
+  c.lineJoin = 'round';
+  for (let i = 0; i < 9; i++) {                       // túnel de corazones
+    const z = (i / 9 + state.t * 0.1) % 1;
+    const s = base * (0.45 + z * z * 3.4) * (1 + audio.sub * 0.08);
+    c.strokeStyle = col(h + i*8, 90, 62, Math.min(1, z * 1.4) * 0.8);
+    c.lineWidth = 1 + z * 5 * (1 + audio.kick);
+    heartPath(c, s); c.stroke();
+  }
+  // corazón central: late con el bombo (lub-dub siguiendo el tempo)
+  const ph = audio.phase;
+  const dub = ph > 0.18 ? 0.5 * Math.exp(-(ph - 0.18) * 14) : 0;
+  const s0 = base * (1 + audio.kick * 0.25 + (Math.exp(-ph * 14) + dub) * 0.05);
+  const g = c.createRadialGradient(0, -s0*3, 0, 0, 0, s0 * 18);
+  g.addColorStop(0, col(h + 10, 95, 70, 0.85)); g.addColorStop(0.5, col(h, 90, 48, 0.55)); g.addColorStop(1, col(h - 10, 90, 30, 0.15));
+  c.fillStyle = g; heartPath(c, s0); c.fill();
+  c.globalCompositeOperation = 'lighter';
+  const spr = sprite(h + 10, 'glow');
+  const hs = s0 * 50; c.globalAlpha = 0.15 + audio.kick * 0.35; c.drawImage(spr, -hs/2, -hs/2, hs, hs);
+  for (let i = 0; i < 90; i++) {                      // contorno de luces que titilan con los hats
+    const t = i / 90 * TAU + state.t * 0.2, [x, y] = heartPt(t);
+    const tw = 0.6 + 0.4 * Math.sin(state.t * 5 + i * 1.7), sz = (12 + audio.hat * 16) * tw * k;
+    c.globalAlpha = 0.85 * tw; c.drawImage(spr, x*s0*1.08 - sz/2, y*s0*1.08 - sz/2, sz, sz);
+  }
+  if (state.beatNow) for (let i = 0; i < 45; i++) {   // chispas que salen del contorno en cada bombo
+    const [x, y] = heartPt(Math.random() * TAU), len = Math.hypot(x, y) || 1, v = (80 + Math.random()*240) * k;
+    sparks.push({x:x*s0, y:y*s0, vx:x/len*v, vy:y/len*v, life:1, h:h + Math.random()*40, s:4 + Math.random()*10});
+  }
+  if (sparks.length > 900) sparks.splice(0, sparks.length - 900);
+  for (let i = sparks.length - 1; i >= 0; i--) {
+    const p = sparks[i];
+    p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= 0.98; p.vy *= 0.98; p.life -= dt * 0.8;
+    if (p.life <= 0) { sparks[i] = sparks[sparks.length-1]; sparks.pop(); continue; }
+    const sz = p.s * k * 2; c.globalAlpha = p.life;
+    c.drawImage(sprite(p.h, 'glow'), p.x - sz/2, p.y - sz/2, sz, sz);
+  }
+  c.globalAlpha = 1; c.globalCompositeOperation = 'source-over';
+}
+
+const SCENE_FN = [sTunnel, sSpectrum, sParticles, sFlow, sDistort, sWaves, sKaleido, sStrobe, sGrid, sMediaOnly, sHeart];
 
 // ---------- Render ----------
 function drawMessage(o){
@@ -1008,11 +1082,70 @@ function render(dt){
 }
 
 // ---------- Interfaz ----------
-const sceneEls = [], knobEls = [];
+const padEls = [], vizEls = [], knobEls = [];
+let assigning = null;
+function triggerPad(i, vel){ setScene(pads[i], vel); }
+function assignPad(i, sceneIdx){
+  pads[i] = sceneIdx; store.set('pads', pads);
+  stopAssign(); renderPads();
+  hint(`✓ Pad ${i+1} → ${SCENES[sceneIdx]}`);
+}
+function startAssign(sceneIdx){
+  assigning = sceneIdx; $('#hud').classList.add('assigning');
+  vizEls.forEach((d, j) => d.classList.toggle('picked', j === sceneIdx));
+  hint(`Ahora toca el pad donde quieres «${SCENES[sceneIdx]}» (Esc para cancelar)`);
+}
+function stopAssign(){ assigning = null; $('#hud').classList.remove('assigning'); vizEls.forEach(d => d.classList.remove('picked')); }
+function renderPads(){
+  padEls.forEach((d, i) => {
+    const s = pads[i], th = thumbs[SCENES[s]];
+    d.style.backgroundImage = th ? `url("${th}")` : '';
+    d.classList.toggle('noimg', !th);
+    d.innerHTML = `<span class="n">${i+1}</span>${th ? '' : SCENE_ICON[s]}<span class="nm">${SCENES[s]}</span>`;
+  });
+  vizEls.forEach((d, j) => {
+    const onPads = pads.map((s, i) => s === j ? i + 1 : 0).filter(Boolean);
+    d.querySelector('.tag').textContent = onPads.length ? 'PAD ' + onPads.join('·') : '';
+  });
+}
+// miniaturas: se capturan solas cuando un visual lleva ~2 s en pantalla
+const thumbs = store.get('thumbs', {});
+const thumbC = document.createElement('canvas'); thumbC.width = 192; thumbC.height = 120;
+const thumbFresh = new Set();
+let sceneSince = performance.now(), thumbBusy = false;
+function captureThumb(i){
+  const t = thumbC.getContext('2d'), tw = thumbC.width, th = thumbC.height;
+  const sw = cv.width, sh = cv.height, r = tw / th;
+  let cw = sw, ch = sw / r; if (ch > sh) { ch = sh; cw = sh * r; }
+  t.drawImage(cv, (sw - cw) / 2, (sh - ch) / 2, cw, ch, 0, 0, tw, th);
+  try { thumbs[SCENES[i]] = thumbC.toDataURL('image/jpeg', 0.72); store.set('thumbs', thumbs); } catch (e) {}
+  thumbFresh.add(i); paintThumb(i); renderPads();
+}
+function paintThumb(i){
+  const d = vizEls[i]; if (!d) return;
+  const th = thumbs[SCENES[i]];
+  d.style.backgroundImage = th ? `url("${th}")` : '';
+  d.classList.toggle('noimg', !th);
+}
+async function generateThumbs(){
+  if (thumbBusy) return; thumbBusy = true;
+  const orig = state.scene, btn = $('#thumbAll');
+  for (let i = 0; i < SCENES.length; i++) {
+    btn.textContent = `📸 ${i+1}/${SCENES.length} · ${SCENES[i]}`;
+    state.scene = i; sceneSince = performance.now();
+    await new Promise(r => setTimeout(r, 1500));
+    captureThumb(i);
+  }
+  state.scene = orig; sceneSince = performance.now();
+  btn.textContent = '📸 Generar miniaturas'; thumbBusy = false;
+}
 function setMidi(ok, txt){ $('#midiDot').classList.toggle('ok', ok); $('#midiSt').textContent = 'MIDI: ' + txt; }
 function setAudio(ok, txt){ $('#audDot').classList.toggle('ok', ok); $('#audSt').textContent = 'Audio: ' + txt; }
 function hint(txt){ $('#learnHint').textContent = txt; }
-function setScene(i, vel){ state.scene = i; state.flash = Math.max(state.flash, 0.25 * (vel || 0)); store.set('scene', i); }
+function setScene(i, vel){
+  if (state.scene !== i) sceneSince = performance.now();
+  state.scene = i; state.flash = Math.max(state.flash, 0.25 * (vel || 0)); store.set('scene', i);
+}
 function arm(learn, el, txt){
   state.learn = learn;
   document.querySelectorAll('.armed').forEach(x => x.classList.remove('armed'));
@@ -1034,13 +1167,36 @@ function renderSlot(i){
   const nm = document.createElement('span'); nm.className = 'nm'; nm.textContent = s.name; d.appendChild(nm);
 }
 function buildHUD(){
-  const sc = $('#scenes');
+  // pads
+  const pb = $('#pads');
+  for (let i = 0; i < 8; i++) {
+    const d = document.createElement('div'); d.className = 'pad';
+    d.onclick = () => {
+      if (assigning != null) { assignPad(i, assigning); return; }
+      if (state.learnMode) { arm({kind:'note', target:{type:'scene', i}}, d, `Toca el pad físico que quieres para el pad ${i+1}`); return; }
+      triggerPad(i, 0.5);
+    };
+    d.addEventListener('dragover', e => { if ([...e.dataTransfer.types].includes('text/x-scene')) { e.preventDefault(); d.classList.add('over'); } });
+    d.addEventListener('dragleave', () => d.classList.remove('over'));
+    d.addEventListener('drop', e => {
+      const v = e.dataTransfer.getData('text/x-scene'); d.classList.remove('over');
+      if (v !== '') { e.preventDefault(); e.stopPropagation(); assignPad(i, +v); }
+    });
+    pb.appendChild(d); padEls.push(d);
+  }
+  // biblioteca de visuales
+  const vb = $('#viz');
   SCENES.forEach((n, i) => {
-    const d = document.createElement('div'); d.className = 'cell';
-    d.innerHTML = `<span>${i+1}</span>${n}`;
-    d.onclick = () => state.learnMode ? arm({kind:'note', target:{type:'scene', i}}, d, `Toca el pad que quieres para «${n}»`) : setScene(i, 0.5);
-    sc.appendChild(d); sceneEls.push(d);
+    const d = document.createElement('div'); d.className = 'vz'; d.draggable = true; d.title = 'Arrastra a un pad, o clic para verlo ahora';
+    d.innerHTML = `<span class="tag"></span><button class="pin" title="Asignar a un pad">📌</button><span class="nm">${SCENE_ICON[i]} ${n}</span>`;
+    d.onclick = () => setScene(i, 0.4);
+    d.querySelector('.pin').onclick = e => { e.stopPropagation(); startAssign(i); };
+    d.addEventListener('dragstart', e => { e.dataTransfer.setData('text/x-scene', String(i)); e.dataTransfer.effectAllowed = 'copy'; });
+    vb.appendChild(d); vizEls.push(d);
   });
+  $('#vizCount').textContent = SCENES.length;
+  $('#thumbAll').onclick = generateThumbs;
+  renderPads(); SCENES.forEach((_, i) => paintThumb(i));
   const kn = $('#knobs');
   PARAMS.forEach((p, i) => {
     const row = document.createElement('div'); row.className = 'knob';
@@ -1108,15 +1264,16 @@ cv.addEventListener('pointerdown', e => burst(e.clientX, e.clientY, 50, H0(), 1)
 addEventListener('keydown', e => {
   if (e.target.matches('input, select, textarea')) { if (e.key === 'Enter') { e.target.blur(); toggleMsg(); } return; }
   const k = e.key.toLowerCase();
-  if (k >= '1' && k <= '9') setScene(+k - 1, 0.4);
-  else if (k === '0') setScene(9, 0.4);
+  if (k >= '1' && k <= '8') triggerPad(+k - 1, 0.4);
+  else if (k === '9') setScene((state.scene - 1 + SCENES.length) % SCENES.length, 0.3);
+  else if (k === '0') setScene((state.scene + 1) % SCENES.length, 0.3);
   else if (k === 'backspace') { if (state.mediaSlot >= 0) toggleMedia(state.mediaSlot); }
   else if ('qwertyui'.includes(k) && k.length === 1) toggleMedia('qwertyui'.indexOf(k));
   else if (k === ' ') { e.preventDefault(); doTap(); }
   else if (k === 'enter') toggleMsg();
   else if (k === 'h') { state.hud = !state.hud; document.body.classList.toggle('clean', !state.hud); }
   else if (k === 'f') { document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen().catch(() => {}); }
-  else if (k === 'escape') { state.learn = null; document.querySelectorAll('.armed').forEach(x => x.classList.remove('armed')); hint(''); }
+  else if (k === 'escape') { stopAssign(); state.learn = null; document.querySelectorAll('.armed').forEach(x => x.classList.remove('armed')); hint(''); }
 });
 
 let fpsAcc = 0, fpsN = 0;
@@ -1132,7 +1289,8 @@ function updateHUD(dt){
     ? (audio.bpm ? `${Math.round(audio.bpm)} BPM` : 'Buscando el bombo…') + (audio.breakdown ? ' · BREAKDOWN' : '') + (audio.drop > 0.3 ? ' · DROP!' : '')
     : `Pulso ${tap.bpm || 120} BPM (tap con Espacio)`;
   PARAMS.forEach((p, i) => knobEls[i].style.width = (p.cur * 100) + '%');
-  sceneEls.forEach((d, i) => d.classList.toggle('on', i === state.scene));
+  padEls.forEach((d, i) => d.classList.toggle('on', pads[i] === state.scene));
+  vizEls.forEach((d, i) => d.classList.toggle('on', i === state.scene));
   slotEls.forEach((d, i) => d.classList.toggle('on', i === state.mediaSlot));
 }
 
@@ -1149,6 +1307,7 @@ function frame(now){
   state.rot += (P.rot.cur - 0.5) * 2 * dt * 1.2 * (0.5 + P.speed.cur);
   render(dt);
   state.flash *= Math.pow(0.0005, dt);
+  if (!thumbBusy && !thumbFresh.has(state.scene) && now - sceneSince > 2000 && !state.showMsg && state.flash < 0.05) captureThumb(state.scene);
   state.beatNow = false;
   updateHUD(dt);
   requestAnimationFrame(frame);

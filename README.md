@@ -6,7 +6,8 @@ Corre en el navegador (Chrome o Edge), sin instalar nada. Hecho por [Oh! Valenti
 
 ## Qué hace
 
-- **10 escenas:** Túnel, Espectro, Partículas (bokeh, niebla y destello anamórfico), Flujo, Distorsión (esfera de vidrio en blanco y negro sobre un video), Ondas, Caleidoscopio, Estrobo, Rejilla y Solo media.
+- **11 visuales:** Túnel, Espectro, Partículas (bokeh, niebla y destello anamórfico), Flujo, Distorsión (esfera de vidrio en blanco y negro sobre un video), Ondas, Caleidoscopio, Estrobo, Rejilla, Solo media y Corazón.
+- **Biblioteca de visuales con miniaturas:** arrastra cualquier visual a uno de los 8 pads (o usa 📌). Las miniaturas se capturan solas.
 - **Detección de bombo y BPM** (110–160), bajo y hats por separado, más breakdowns y drops automáticos.
 - **Acabado de cine:** bloom, viñeta y grano de película.
 - **Audio:** comparte una pestaña de Chrome (YouTube, etc.) con "compartir audio", o usa el micrófono o una entrada de audio (la salida del mixer).
@@ -19,13 +20,13 @@ Corre en el navegador (Chrome o Edge), sin instalar nada. Hecho por [Oh! Valenti
 
 | Control | Acción |
 |---|---|
-| Pads banco A | Escenas 1–8 |
+| Pads banco A | Los 8 visuales que asignes en el panel |
 | Pads banco B | Espacios de media Q–I |
 | Perillas 1–8 | Reactividad, velocidad, color, estela, zoom, giro, espejo, opacidad del media |
 | Teclas | Ráfagas de partículas (la tecla define el color, la fuerza el tamaño) |
 | Joystick | Color y zoom |
 
-**Teclado del computador:** 1–9 y 0 escenas · Q–I media · ⌫ quitar media · Espacio tap tempo · Enter mensaje · H ocultar panel · F pantalla completa.
+**Teclado del computador:** 1–8 pads · 9/0 visual anterior/siguiente · Q–I media · ⌫ quitar media · Espacio tap tempo · Enter mensaje · H ocultar panel · F pantalla completa.
 
 ## Cómo usarlo
 
